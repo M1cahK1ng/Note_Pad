@@ -260,3 +260,47 @@ main {
     color: white;
     border-color: #4A5568;
 }
+
+/* --- Responsive Design for Mobile Devices --- */
+@media (max-width: 768px) {
+    /* Adjust header for vertical stacking on mobile */
+    header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+        padding: 1rem;
+    }
+
+    .header-btns {
+        width: 100%;
+        display: flex;
+        justify-content: space-between; /* Keeps buttons spaced apart */
+    }
+
+    .header-btns button {
+        margin-left: 0; /* Remove margin from desktop view */
+    }
+
+    /* Reduce main padding on smaller screens */
+    main {
+        padding: 1rem;
+    }
+
+    /* Stack the notes header content */
+    .notes-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+    }
+
+    /* Stack the note footer content for better readability */
+    .saved-note-footer {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .note-deletion-timer-container {
+        width: 100%; /* Ensures the right-aligned text behaves correctly */
+    }
+}
