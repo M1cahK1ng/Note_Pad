@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notepad</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <header>
+        <div class="title">
+            <h2>My Simple Notepad</h2>
+        </div>
+
+
+        <div class="header-btns">
+            <button id="toggle-timers-btn" title="Show/Hide auto-deletion timers for each note">Show Deletion Times</button>
+            <button id="new-note-btn">New Note</button>
+        </div>
+    </header>
+
+
+    <main>
+        <div class="welcome">
+            <div class="welcome-text">
+                <h2>Welcome To My Notepad</h2>
+            </div>
+            <p>
+                Here you can create, edit, and save yours notes easily.
+            </p>
+        </div>
+
+
+        <div class="notes">
+            <div class="notes-header">
+                <h2>Your Notes</h2>
+                <div class="notes-controls">
+                    <label for="sort-options">Sort by:</label>
+                    <select id="sort-options">
+                        <option value="modified-desc">Last Modified (Newest)</option>
+                        <option value="created-desc">Created Date (Newest)</option>
+                        <option value="created-asc">Created Date (Oldest)</option>
+                        <option value="title-asc">Title (A-Z)</option>
+                        <option value="title-desc">Title (Z-A)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Container for tag filter buttons -->
+            <div id="tag-filter-container"></div>
+
+            <!-- Container for creating a new note (initially hidden) -->
+            <div id="note-creator" class="note-editor hidden">
+                <input type="text" id="note-title-input" placeholder="Note Title">
+                <textarea id="note-content-input" placeholder="Type your note here..."></textarea>
+                <input type="text" id="note-tags-input" placeholder="Add tags, separated by commas">
+                <div id="note-actions" class="hidden">
+                    <button id="save-note-btn">Save</button>
+                    <button id="cancel-note-btn">Cancel</button>
+                </div>
+            </div>
+
+            <!-- Container where saved notes will be displayed -->
+            <div id="notes-list">
+                <p id="notes-placeholder">
+                    Your Saved notes will appear here. Use the editing buttons to manage the note
+                </p>
+            </div>
+        </div>
+    </main>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
