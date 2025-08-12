@@ -4,4 +4,4 @@ This was created using html, css and javascript. I create it for users to be abl
 
 ## Links Info
 
-Link for Vercel ([Link To My Notepad](https://note-pad-six-mu.vercel.app/))
+Link for Vercel ([Link To My Notepad](https://note-pad-six-mu.vercel.app/)), Link for Netlify ([Link To My Notepad](https://notepadf.netlify.app/))
