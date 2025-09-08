@@ -151,6 +151,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (note.modified && note.modified > note.id + 1000) {
                     metaHTML += `<br>Modified: ${new Date(note.modified).toLocaleString()}`;
                 }
+                // Show 'Archived' date if the note is archived and has the timestamp
+                if (note.isArchived && note.archivedAt) {
+                    metaHTML += `<br>Archived: ${new Date(note.archivedAt).toLocaleString()}`;
+                }
 
                 const tagsHTML = (note.tags || [])
                     .map(tag => `<span class="note-tag">${tag}</span>`)
@@ -166,6 +170,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         <span class="note-deletion-timer" data-deletion-time="${note.deletionTime}">--:--:--</span>
                     </div>`;
                 const archiveBtnText = note.isArchived ? 'Unarchive' : 'Archive';
+                const deleteBtnText = note.isArchived ? 'Delete Permanently' : 'Delete';
+                const deleteBtnClass = note.isArchived ? 'delete-note-btn permanent' : 'delete-note-btn';
 
                 noteEl.innerHTML = `
                     <h3>${note.title}</h3>
@@ -176,7 +182,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div class="saved-note-actions">
                             <button class="archive-note-btn" data-id="${note.id}">${archiveBtnText}</button>
                             <button class="edit-note-btn" data-id="${note.id}">Edit</button>
-                            <button class="delete-note-btn" data-id="${note.id}">Delete</button>
+                            <button class="${deleteBtnClass}" data-id="${note.id}">${deleteBtnText}</button>
                         </div>
                         ${timerContainerHTML}
                     </div>
@@ -202,7 +208,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 modified: now, // Initially, modified time is the same as creation
                 tags: tags,
                 deletionTime: now + NOTE_LIFESPAN_MS, // Set deletion time 30 days from now
-                isArchived: false // New notes are not archived by default
+                isArchived: false, // New notes are not archived by default
+                archivedAt: null // No archive date initially
             };
             showNotification('Note Saved!', `The note "${title}" has been saved. It will be auto-deleted in 30 days unless archived.`);
             notes.push(newNote);
@@ -234,13 +241,21 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // Formats milliseconds into HH:MM:SS
+    // Formats milliseconds into Days, HH:MM:SS
     const formatTime = (ms) => {
         if (ms < 0) ms = 0;
         const totalSeconds = Math.floor(ms / 1000);
-        const hours = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
+
+        const days = Math.floor(totalSeconds / 86400); // 86400 seconds in a day
+        const hours = Math.floor((totalSeconds % 86400) / 3600).toString().padStart(2, '0');
         const minutes = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
         const seconds = (totalSeconds % 60).toString().padStart(2, '0');
+
+        if (days > 0) {
+            const dayString = days === 1 ? 'day' : 'days';
+            return `${days} ${dayString}, ${hours}:${minutes}:${seconds}`;
+        }
+
         return `${hours}:${minutes}:${seconds}`;
     };
 
@@ -298,8 +313,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Individual Note Actions ---
 
     const handleDeleteNote = (id) => {
-        if (confirm('Are you sure you want to delete this note?')) {
-            const noteIdNum = parseInt(id, 10);
+        const noteIdNum = parseInt(id, 10);
+        const noteToDelete = notes.find(note => note.id === noteIdNum);
+
+        if (!noteToDelete) return;
+
+        const confirmationMessage = noteToDelete.isArchived
+            ? 'This action is irreversible. Are you sure you want to permanently delete this archived note?'
+            : 'Are you sure you want to delete this note?';
+
+        if (confirm(confirmationMessage)) {
             warnedNoteIds.delete(noteIdNum); // Clean up warned ID if it exists
             notes = notes.filter(note => note.id !== noteIdNum);
             localStorage.setItem('notes', JSON.stringify(notes));
@@ -313,16 +336,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (noteIndex > -1) {
             const note = notes[noteIndex];
-            note.isArchived = !note.isArchived; // Toggle status
+            let shouldUpdate = false;
 
-            if (note.isArchived) {
+            // If the note is currently active, we are archiving it. No confirmation needed.
+            if (!note.isArchived) {
+                note.isArchived = true;
+                note.archivedAt = Date.now(); // Set the archived timestamp
                 showNotification('Note Archived', `"${note.title}" is now archived and will not be auto-deleted.`);
+                shouldUpdate = true;
             } else {
-                note.deletionTime = Date.now() + NOTE_LIFESPAN_MS; // Reset timer on unarchive
-                showNotification('Note Unarchived', `"${note.title}" is now active. The 30-day deletion timer has been reset.`);
+                // If the note is archived, we are unarchiving it. Ask for confirmation.
+                if (confirm('Unarchiving this note will reset its 30-day deletion timer. Are you sure?')) {
+                    note.isArchived = false;
+                    note.archivedAt = null; // Clear the archived timestamp
+                    note.deletionTime = Date.now() + NOTE_LIFESPAN_MS; // Reset timer on unarchive
+                    showNotification('Note Unarchived', `"${note.title}" is now active. The 30-day deletion timer has been reset.`);
+                    shouldUpdate = true;
+                }
             }
-            localStorage.setItem('notes', JSON.stringify(notes));
-            updateView();
+
+            if (shouldUpdate) {
+                localStorage.setItem('notes', JSON.stringify(notes));
+                updateView();
+            }
         }
     };
 

@@ -190,6 +190,17 @@ main {
     border-color: #c53030;
 }
 
+.saved-note-actions .delete-note-btn.permanent {
+    color: #c53030;
+    border-color: #fed7d7;
+}
+
+.saved-note-actions .delete-note-btn.permanent:hover {
+    background-color: #c53030;
+    color: white;
+    border-color: #9b2c2c;
+}
+
 .saved-note-actions .edit-note-btn:hover,
 .saved-note-actions .save-edit-btn:hover {
     background-color: #3182ce; /* blue */
