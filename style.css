@@ -226,6 +226,11 @@ main {
     border-left: 5px solid #ffc107;
 }
 
+.saved-note.archived {
+    background-color: #f7fafc; /* A very light gray */
+    border-left: 5px solid #a0aec0; /* A muted gray */
+}
+
 .header-btns {
     display: flex;
     align-items: center;
@@ -237,11 +242,23 @@ main {
     font-weight: bold;
 }
 
-#tag-filter-container {
+.filter-controls {
     margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+#status-filter-container,
+#tag-filter-container {
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
+}
+
+#status-filter-container {
+    border-bottom: 1px solid #e2e8f0;
+    padding-bottom: 15px;
 }
 
 .tag-filter-btn {

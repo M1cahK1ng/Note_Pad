@@ -20,21 +20,50 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- State Variables ---
     let notes = JSON.parse(localStorage.getItem('notes')) || [];
     let currentFilterTag = null; // To track the active tag filter
+    let currentStatusFilter = 'active'; // 'active', 'archived', or 'all'
     let currentSortOrder = 'modified-desc'; // Default sort order
     let showDeletionTimers = false; // To track visibility of timers
     let warnedNoteIds = new Set(); // Tracks notes that have received an expiration warning
     let mainTimerInterval; // To hold the main interval
-    const NOTE_LIFESPAN_MS = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+    const NOTE_LIFESPAN_MS = 30 * 24 * 60 * 60 * 1000; // 30 days in milliseconds
     const NOTIFICATION_WARNING_MS = 5 * 60 * 1000; // 5 minutes before expiration
 
     // --- Main View Update Function ---
     const updateView = () => {
         sortOptions.value = currentSortOrder; // Sync dropdown with state
+        renderStatusFilters();
         renderTagFilters();
         renderNotes();
     };
 
     // --- Core Note Functions ---
+
+    // Renders the status filter buttons (Active, Archived, All)
+    const renderStatusFilters = () => {
+        const statusContainer = document.getElementById('status-filter-container');
+        statusContainer.innerHTML = ''; // Clear existing buttons
+
+        const statuses = [
+            { key: 'active', text: 'Active Notes' },
+            { key: 'archived', text: 'Archived' },
+            { key: 'all', text: 'All Notes' }
+        ];
+
+        statuses.forEach(status => {
+            const button = document.createElement('button');
+            button.textContent = status.text;
+            button.dataset.status = status.key;
+            button.classList.add('status-filter-btn');
+            if (status.key === currentStatusFilter) {
+                button.classList.add('active');
+            }
+            button.addEventListener('click', () => {
+                currentStatusFilter = status.key;
+                updateView();
+            });
+            statusContainer.appendChild(button);
+        });
+    };
 
     // Renders the tag filter buttons based on all unique tags in the notes
     const renderTagFilters = () => {
@@ -70,12 +99,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const renderNotes = () => {
         notesList.innerHTML = ''; // Clear current list
 
-        // 1. Filter notes by the selected tag
-        let notesToRender = currentFilterTag
-            ? notes.filter(note => (note.tags || []).includes(currentFilterTag))
-            : notes;
+        // 1. Filter notes by status (active, archived, all)
+        let notesToRender = notes.filter(note => {
+            if (currentStatusFilter === 'active') {
+                return !note.isArchived;
+            }
+            if (currentStatusFilter === 'archived') {
+                return note.isArchived;
+            }
+            return true; // 'all'
+        });
 
-        // 2. Sort the filtered notes based on the current sort order
+        // 2. Further filter by the selected tag
+        if (currentFilterTag) {
+            notesToRender = notesToRender.filter(note => (note.tags || []).includes(currentFilterTag));
+        }
+
+        // 3. Sort the filtered notes based on the current sort order
         // We sort a *copy* to avoid changing the original array order, which is important for auto-delete
         const sortedNotes = [...notesToRender].sort((a, b) => {
             switch (currentSortOrder) {
@@ -93,7 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // 3. Render the sorted notes
+        // 4. Render the sorted notes
         if (sortedNotes.length === 0) {
             notesList.appendChild(notesPlaceholder);
             notesPlaceholder.style.display = 'block';
@@ -102,6 +142,7 @@ document.addEventListener('DOMContentLoaded', () => {
             sortedNotes.forEach(note => {
                 const noteEl = document.createElement('div');
                 noteEl.classList.add('saved-note');
+                noteEl.classList.toggle('archived', !!note.isArchived);
                 noteEl.dataset.id = note.id;
 
                 // Build the metadata string to include a 'modified' timestamp if available
@@ -115,12 +156,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     .map(tag => `<span class="note-tag">${tag}</span>`)
                     .join('');
 
+                // The timer is not relevant for archived notes
+                const timerDisplayClass = showDeletionTimers && !note.isArchived ? '' : 'hidden';
+
                 // Container for the deletion timer, visibility controlled by a class
                 const timerContainerHTML = `
-                    <div class="note-deletion-timer-container ${showDeletionTimers ? '' : 'hidden'}">
+                    <div class="note-deletion-timer-container ${timerDisplayClass}">
                         <span class="timer-label">Deletes in:</span>
                         <span class="note-deletion-timer" data-deletion-time="${note.deletionTime}">--:--:--</span>
                     </div>`;
+                const archiveBtnText = note.isArchived ? 'Unarchive' : 'Archive';
 
                 noteEl.innerHTML = `
                     <h3>${note.title}</h3>
@@ -129,6 +174,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="saved-note-footer">
                         <span class="saved-note-meta">${metaHTML}</span>
                         <div class="saved-note-actions">
+                            <button class="archive-note-btn" data-id="${note.id}">${archiveBtnText}</button>
                             <button class="edit-note-btn" data-id="${note.id}">Edit</button>
                             <button class="delete-note-btn" data-id="${note.id}">Delete</button>
                         </div>
@@ -155,9 +201,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 content,
                 modified: now, // Initially, modified time is the same as creation
                 tags: tags,
-                deletionTime: now + NOTE_LIFESPAN_MS // Set deletion time 24 hours from now
+                deletionTime: now + NOTE_LIFESPAN_MS, // Set deletion time 30 days from now
+                isArchived: false // New notes are not archived by default
             };
-            showNotification('Note Saved!', `The note "${title}" has been saved and will be auto-deleted in 24 hours.`);
+            showNotification('Note Saved!', `The note "${title}" has been saved. It will be auto-deleted in 30 days unless archived.`);
             notes.push(newNote);
             notes.sort((a, b) => a.id - b.id); // Keep notes sorted by creation time (oldest first)
             localStorage.setItem('notes', JSON.stringify(notes));
@@ -204,6 +251,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Check for notes that are about to expire to send a warning
             notes.forEach(note => {
+                // Skip archived notes from warnings
+                if (note.isArchived) return;
+
                 const remainingMs = note.deletionTime - now;
                 if (remainingMs > 0 && remainingMs < NOTIFICATION_WARNING_MS && !warnedNoteIds.has(note.id)) {
                     showNotification(
@@ -216,6 +266,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Filter out expired notes and clean up the warned IDs set
             notes = notes.filter(note => {
+                // Always keep archived notes
+                if (note.isArchived) {
+                    return true;
+                }
                 const isExpired = now >= note.deletionTime;
                 if (isExpired) {
                     warnedNoteIds.delete(note.id); // Clean up
@@ -231,7 +285,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             // If timers are visible, update their text content directly
-            if (showDeletionTimers) {
+            if (showDeletionTimers) { // This will naturally skip archived notes as their containers are hidden
                 document.querySelectorAll('.note-deletion-timer').forEach(timerEl => {
                     const deletionTime = parseInt(timerEl.dataset.deletionTime, 10);
                     const remainingMs = deletionTime - now;
@@ -248,6 +302,25 @@ document.addEventListener('DOMContentLoaded', () => {
             const noteIdNum = parseInt(id, 10);
             warnedNoteIds.delete(noteIdNum); // Clean up warned ID if it exists
             notes = notes.filter(note => note.id !== noteIdNum);
+            localStorage.setItem('notes', JSON.stringify(notes));
+            updateView();
+        }
+    };
+
+    const handleArchiveNote = (id) => {
+        const noteIdNum = parseInt(id, 10);
+        const noteIndex = notes.findIndex(note => note.id === noteIdNum);
+
+        if (noteIndex > -1) {
+            const note = notes[noteIndex];
+            note.isArchived = !note.isArchived; // Toggle status
+
+            if (note.isArchived) {
+                showNotification('Note Archived', `"${note.title}" is now archived and will not be auto-deleted.`);
+            } else {
+                note.deletionTime = Date.now() + NOTE_LIFESPAN_MS; // Reset timer on unarchive
+                showNotification('Note Unarchived', `"${note.title}" is now active. The 30-day deletion timer has been reset.`);
+            }
             localStorage.setItem('notes', JSON.stringify(notes));
             updateView();
         }
@@ -291,7 +364,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 notes[noteIndex].modified = Date.now(); // Update the modified timestamp
                 notes[noteIndex].deletionTime = Date.now() + NOTE_LIFESPAN_MS; // Reset timer on edit
                 notes[noteIndex].tags = newTags;
-                showNotification('Note Updated!', `The note "${newTitle}" has been updated. The 24-hour deletion timer has been reset.`);
+                showNotification('Note Updated!', `The note "${newTitle}" has been updated. The 30-day deletion timer has been reset.`);
                 localStorage.setItem('notes', JSON.stringify(notes));
                 updateView(); // Re-render the view
             }
@@ -345,6 +418,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (target.classList.contains('delete-note-btn')) {
             handleDeleteNote(noteId);
+        } else if (target.classList.contains('archive-note-btn')) {
+            handleArchiveNote(noteId);
         } else if (target.classList.contains('edit-note-btn')) {
             handleEditNote(noteId);
         } else if (target.classList.contains('save-edit-btn')) {
